@@ -76,6 +76,24 @@ def split_image_grid(input_dir, output_dir, grid_size, output_text):
 
     output_text.insert('end', "\nImage Grid Split Complete")
 
+def create_grid_image(input_dir, output_dir, rows, cols, pixel_size, output_text):
+    image_files = [os.path.join(input_dir, f) for f in os.listdir(input_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+    images = [Image.open(f) for f in image_files]
+    images = [img.resize((pixel_size, pixel_size), Image.Resampling.LANCZOS) for img in images]
+
+    grid_width = cols * pixel_size
+    grid_height = rows * pixel_size
+    grid_image = Image.new('RGB', (grid_width, grid_height))
+
+    for index, image in enumerate(images):
+        if index >= rows * cols:
+            break
+        row = index // cols
+        col = index % cols
+        grid_image.paste(image, (col * pixel_size, row * pixel_size))
+
+    grid_image.save(os.path.join(output_dir, 'grid_image.png'))
+    output_text.insert('end', "\nGrid Image Created")
 # Main window
 root = tk.Tk()
 root.title("File Hierarchy and Image Resizer")
@@ -165,6 +183,22 @@ output_text_3 = ScrolledText(tab3, wrap='word')
 output_text_3.pack(fill='both', expand=True)
 copy_btn_3 = tk.Button(tab3, text="Copy Output to Clipboard", command=lambda: copy_to_clipboard(output_text_3, root), bg='black', fg='white', font=d_font)
 copy_btn_3.pack()
+
+
+tk.Label(tab3, text="Rows: ", bg='yellow', font=d_font).pack(side='left')
+rows_field = tk.Entry(tab3, width=10)
+rows_field.pack(side='left')
+
+tk.Label(tab3, text="Columns: ", bg='yellow', font=d_font).pack(side='left')
+cols_field = tk.Entry(tab3, width=10)
+cols_field.pack(side='left')
+
+tk.Label(tab3, text="Pixel Size: ", bg='yellow', font=d_font).pack(side='left')
+pixel_size_field = tk.Entry(tab3, width=10)
+pixel_size_field.pack(side='left')
+
+create_grid_btn = tk.Button(tab3, text="Create Grid Image", command=lambda: create_grid_image(input_path_field_3.get(), output_path_field_3.get(), int(rows_field.get()), int(cols_field.get()), int(pixel_size_field.get()), output_text_3), bg='black', fg='white', font=d_font)
+create_grid_btn.pack()
 
 root.mainloop()
 
