@@ -4,6 +4,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from tkinter.scrolledtext import ScrolledText
 from PIL import Image
+from moviepy.editor import VideoFileClip, concatenate_videoclips
 
 # Function to convert a directory path to a dictionary structure
 def directory_to_dict(path):
@@ -16,8 +17,12 @@ def directory_to_dict(path):
 # Function to browse for a folder
 def browse_button(input_field):
     filename = filedialog.askdirectory()
-    input_field.delete(0, 'end')
-    input_field.insert('end', filename)
+    # input_field.delete(0, 'end')
+    input_field.set(filename)
+
+def browse_button_file(input_field_var):
+    filename = filedialog.askopenfilename()  # Ask for a file instead of a directory for videos
+    input_field_var.set(filename)
 
 # Function to print the directory structure
 def print_hierarchy(input_field, output_text):
@@ -94,6 +99,58 @@ def create_grid_image(input_dir, output_dir, rows, cols, pixel_size, output_text
 
     grid_image.save(os.path.join(output_dir, 'grid_image.png'))
     output_text.insert('end', "\nGrid Image Created")
+
+def crop_all_videos_in_folder(input_dir, output_dir, x, y, width, height, output_text):
+    # Ensure output directory exists
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    # List all video files in the input directory
+    for file in os.listdir(input_dir):
+        if file.lower().endswith(".mp4"):
+            input_path = os.path.join(input_dir, file)
+            output_path = os.path.join(output_dir, "cropped_" + file)  # Add 'cropped_' prefix to output filename
+            try:
+                # Load the video file
+                video = VideoFileClip(input_path)
+                # Crop it
+                cropped_video = video.crop(x1=x, y1=y, width=width, height=height)
+                # Write the cropped video to the output directory
+                cropped_video.write_videofile(output_path, codec="libx264", audio_codec="aac")
+                cropped_video.close()  # Properly close the video file to free up resources
+                video.close()  # Close the original video file as well
+                output_text.insert('end', f"\nVideo {file} cropped and saved to {output_path}")
+            except Exception as e:
+                messagebox.showerror("Error", str(e))
+                continue
+
+def merge_videos_in_folder(input_dir, output_dir, output_text):
+    # Ensure output directory exists
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    # Gather all mp4 files in the input directory
+    video_files = [os.path.join(input_dir, f) for f in sorted(os.listdir(input_dir)) if f.lower().endswith(".mp4")]
+
+    # Load all videos into MoviePy VideoFileClip objects
+    clips = [VideoFileClip(f) for f in video_files]
+
+    # Concatenate all video clips
+    final_clip = concatenate_videoclips(clips)
+
+    # Define the output file path
+    output_file = os.path.join(output_dir, "merged_video.mp4")
+
+    # Write the concatenated clip to the output file
+    final_clip.write_videofile(output_file, codec="libx264", audio_codec="aac", fps=30)
+
+    # Close all clips to free up resources
+    for clip in clips:
+        clip.close()
+    final_clip.close()
+
+    # Notify the user that the merging is complete
+    output_text.insert('end', f"\nMerged video saved to {output_file}")
 # Main window
 root = tk.Tk()
 root.title("File Hierarchy and Image Resizer")
@@ -116,6 +173,11 @@ tab_control.pack(expand=1, fill="both")
 # Third tab (Image Grid Splitter)
 tab3 = ttk.Frame(tab_control)
 tab_control.add(tab3, text='Image Grid Splitter')
+tab_control.pack(expand=1, fill="both")
+
+# Fourth tab (Video Cropper)
+tab4 = ttk.Frame(tab_control)
+tab_control.add(tab4, text='Video Cropper')
 tab_control.pack(expand=1, fill="both")
 
 # File Hierarchy Printer Components
@@ -160,6 +222,58 @@ output_text_2.pack(fill='both', expand=True)
 copy_btn_2 = tk.Button(tab2, text="Copy Json to Clipboard", command=lambda: copy_to_clipboard(output_text_2, root), bg='black', fg='white', font=d_font)
 copy_btn_2.pack()
 
+# Video Cropper Components
+input_video_path = tk.StringVar()
+output_video_path = tk.StringVar()
+x_offset = tk.IntVar()
+y_offset = tk.IntVar()
+crop_width = tk.IntVar()
+crop_height = tk.IntVar()
+
+def browse_video_input_dir():
+    dirname = filedialog.askdirectory()
+    input_video_path.set(dirname)
+
+def browse_video_output_dir():
+    dirname = filedialog.askdirectory()
+    output_video_path.set(dirname)
+
+tk.Label(tab4, text="Video Path: ").pack()
+input_video_entry = tk.Entry(tab4, textvariable=input_video_path, width=80).pack(fill='x')
+tk.Button(tab4, text="Input Folder", command=browse_video_input_dir).pack()
+tk.Label(tab4, text="Output Path: ").pack()
+tk.Button(tab4, text="Output Folder", command=browse_video_output_dir).pack()
+output_video_entry = tk.Entry(tab4, textvariable=output_video_path, width=80).pack(fill='x')
+
+tk.Label(tab4, text="X Offset: ").pack()
+x_offset_entry = tk.Entry(tab4, textvariable=x_offset)
+x_offset_entry.pack()
+tk.Label(tab4, text="Y Offset: ").pack()
+y_offset_entry = tk.Entry(tab4, textvariable=y_offset)
+y_offset_entry.pack()
+tk.Label(tab4, text="Width: ").pack()
+crop_width_entry = tk.Entry(tab4, textvariable=crop_width)
+crop_width_entry.pack()
+tk.Label(tab4, text="Height: ").pack()
+crop_height_entry = tk.Entry(tab4, textvariable=crop_height)
+crop_height_entry.pack()
+
+
+
+def crop_videos():
+    x = int(x_offset_entry.get())
+    y = int(y_offset_entry.get())
+    width = int(crop_width_entry.get())
+    height = int(crop_height_entry.get())
+    crop_all_videos_in_folder(input_video_path.get(), output_video_path.get(), x, y, width, height, output_text_4)
+
+crop_btn = tk.Button(tab4, text="Crop Videos", command=crop_videos)
+crop_btn.pack()
+merge_btn = tk.Button(tab4, text="Merge Videos", command=lambda: merge_videos_in_folder(input_video_path.get(), output_video_path.get(), output_text_4))
+merge_btn.pack()
+
+output_text_4 = ScrolledText(tab4, wrap='word')
+output_text_4.pack(fill='both', expand=True)
 
 # Image Grid Splitter Components
 input_path_field_3 = tk.StringVar()
@@ -183,7 +297,6 @@ output_text_3 = ScrolledText(tab3, wrap='word')
 output_text_3.pack(fill='both', expand=True)
 copy_btn_3 = tk.Button(tab3, text="Copy Output to Clipboard", command=lambda: copy_to_clipboard(output_text_3, root), bg='black', fg='white', font=d_font)
 copy_btn_3.pack()
-
 
 tk.Label(tab3, text="Rows: ", bg='yellow', font=d_font).pack(side='left')
 rows_field = tk.Entry(tab3, width=10)
